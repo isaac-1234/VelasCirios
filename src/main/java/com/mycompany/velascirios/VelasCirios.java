@@ -1,81 +1,132 @@
 package com.mycompany.velascirios;
+
+import java.sql.*;
 import java.util.Scanner;
 
 public class VelasCirios {
+    private static Scanner scanner = new Scanner(System.in);
+
     public static void main(String[] args) {
-        AccesoDatos accesoDatos = new AccesoDatos();
-        Scanner scanner = new Scanner(System.in);
+        System.out.println("=== Sistema Velas y Cirios ===");
 
-        while (true) {
-            System.out.println("\n=== SISTEMA DE GESTIÓN DE PRODUCTOS ===");
-            System.out.println("1. Añadir Producto");
-            System.out.println("2. Listar Productos");
-            System.out.println("3. Actualizar Producto");
-            System.out.println("4. Eliminar Producto");
-            System.out.println("5. Salir");
-            System.out.print("Elige una opción: ");
+        // Solicitar credenciales
+        System.out.print("Usuario: ");
+        String username = scanner.nextLine();
+        System.out.print("Contraseña: ");
+        String password = scanner.nextLine();
 
-            int opcion = scanner.nextInt();
-            scanner.nextLine(); // Consumir salto de línea
-
-            try {
-                switch (opcion) {
-                    case 1:
-                        // Añadir Producto
-                        System.out.print("Ingrese el nombre del producto: ");
-                        String nombre = scanner.nextLine();
-                        System.out.print("Ingrese la descripción: ");
-                        String descripcion = scanner.nextLine();
-                        System.out.print("Ingrese el precio: ");
-                        double precio = scanner.nextDouble();
-                        System.out.print("Ingrese la cantidad: ");
-                        int cantidad = scanner.nextInt();
-                        accesoDatos.addProduct(nombre, descripcion, precio, cantidad);
-                        System.out.println("¡Producto añadido con éxito!");
-                        break;
-
-                    case 2:
-                        // Listar Productos
-                        accesoDatos.listProducts();
-                        break;
-
-                    case 3:
-                        // Actualizar Producto
-                        System.out.print("Ingrese el ID del producto a actualizar: ");
-                        int idActualizar = scanner.nextInt();
-                        scanner.nextLine(); // Consumir salto de línea
-                        System.out.print("Ingrese el nuevo nombre: ");
-                        String nuevoNombre = scanner.nextLine();
-                        System.out.print("Ingrese la nueva descripción: ");
-                        String nuevaDescripcion = scanner.nextLine();
-                        System.out.print("Ingrese el nuevo precio: ");
-                        double nuevoPrecio = scanner.nextDouble();
-                        System.out.print("Ingrese la nueva cantidad: ");
-                        int nuevaCantidad = scanner.nextInt();
-                        accesoDatos.updateProduct(idActualizar, nuevoNombre, nuevaDescripcion, nuevoPrecio, nuevaCantidad);
-                        System.out.println("¡Producto actualizado con éxito!");
-                        break;
-
-                    case 4:
-                        // Eliminar Producto
-                        System.out.print("Ingrese el ID del producto a eliminar: ");
-                        int idEliminar = scanner.nextInt();
-                        accesoDatos.deleteProduct(idEliminar);
-                        System.out.println("¡Producto eliminado con éxito!");
-                        break;
-
-                    case 5:
-                        // Salir
-                        System.out.println("Saliendo... ¡Adiós!");
-                        scanner.close();
-                        return;
-
-                    default:
-                        System.out.println("Opción inválida. Intenta de nuevo.");
-                }
-            } catch (Exception e) {
-                System.out.println("Ocurrió un error: " + e.getMessage());
+        try {
+            String role = authenticate(username, password);
+            if (role != null) {
+                System.out.println("\nInicio de sesión exitoso. Rol: " + role);
+                showMenu(role);
+            } else {
+                System.out.println("Error: Usuario o contraseña incorrectos.");
             }
+        } catch (SQLException e) {
+            System.out.println("Error de conexión a la base de datos: " + e.getMessage());
+        }
+    }
+
+    // Método para autenticar usuario y obtener su rol
+    private static String authenticate(String username, String password) throws SQLException {
+        String query = "SELECT rol FROM usuarios WHERE nombre = ? AND contraseña = ?";
+        try (Connection conn = Datos.getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, username);
+            stmt.setString(2, password);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("rol"); // Devuelve el rol del usuario
+                }
+            }
+        }
+        return null; // Retorna null si no encuentra el usuario
+    }
+
+    // Menú de opciones según el rol
+    private static void showMenu(String role) {
+        while (true) {
+            System.out.println("\n=== Menú Principal ===");
+            System.out.println("1. Ver productos");
+            if (role.equals("admin")) {
+                System.out.println("2. Agregar producto");
+                System.out.println("3. Eliminar producto");
+            }
+            System.out.println("0. Salir");
+            System.out.print("Seleccione una opción: ");
+            int option = scanner.nextInt();
+            scanner.nextLine(); // Limpiar buffer
+
+            switch (option) {
+                case 1:
+                    listarProductos();
+                    break;
+                case 2:
+                    if (role.equals("admin")) agregarProducto();
+                    else System.out.println("Acceso denegado.");
+                    break;
+                case 3:
+                    if (role.equals("admin")) eliminarProducto();
+                    else System.out.println("Acceso denegado.");
+                    break;
+                case 0:
+                    System.out.println("Saliendo del sistema...");
+                    return;
+                default:
+                    System.out.println("Opción inválida.");
+            }
+        }
+    }
+
+    // Método para listar productos
+    private static void listarProductos() {
+        System.out.println("\n=== Lista de Productos ===");
+        String query = "SELECT * FROM productos";
+        try (Connection conn = Datos.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
+            while (rs.next()) {
+                System.out.println("ID: " + rs.getInt("id") + " | Nombre: " + rs.getString("nombre") + " | Precio: $" + rs.getDouble("precio"));
+            }
+        } catch (SQLException e) {
+            System.out.println("Error al obtener productos: " + e.getMessage());
+        }
+    }
+
+    // Método para agregar un producto (solo para admin)
+    private static void agregarProducto() {
+        System.out.print("Nombre del producto: ");
+        String nombre = scanner.nextLine();
+        System.out.print("Precio: ");
+        double precio = scanner.nextDouble();
+        scanner.nextLine(); // Limpiar buffer
+String query = "INSERT INTO productos (nombre, precio) VALUES (?, ?)";
+        try (Connection conn = Datos.getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, nombre);
+            stmt.setDouble(2, precio);
+            stmt.executeUpdate();
+            System.out.println("Producto agregado con éxito.");
+        } catch (SQLException e) {
+            System.out.println("Error al agregar producto: " + e.getMessage());
+        }
+    }
+
+    // Método para eliminar un producto (solo para admin)
+    private static void eliminarProducto() {
+        System.out.print("ID del producto a eliminar: ");
+        int id = scanner.nextInt();
+        scanner.nextLine(); // Limpiar buffer
+
+        String query = "DELETE FROM productos WHERE id = ?";
+        try (Connection conn = Datos.getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, id);
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                System.out.println("Producto eliminado con éxito.");
+            } else {
+                System.out.println("No se encontró el producto con ID " + id);
+            }
+        } catch (SQLException e) {
+            System.out.println("Error al eliminar producto: " + e.getMessage());
         }
     }
 }
