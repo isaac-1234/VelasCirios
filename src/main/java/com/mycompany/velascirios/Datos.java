@@ -14,7 +14,7 @@ import java.sql.SQLException;
 
 public class Datos {
 
-    private static final String URL = "jdbc:postgresql://localhost:5432/Velas";
+    private static final String URL = "jdbc:postgresql://localhost:5432/postgres";
     private static final String USUARIO = "postgres";
     private static final String CONTRASEÑA = "1234";
 
