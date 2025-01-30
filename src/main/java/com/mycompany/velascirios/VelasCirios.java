@@ -45,39 +45,42 @@ public class VelasCirios {
     }
 
     // Menú de opciones según el rol
-    private static void showMenu(String role) {
-        while (true) {
-            System.out.println("\n=== Menú Principal ===");
-            System.out.println("1. Ver productos");
-            if (role.equals("admin")) {
-                System.out.println("2. Agregar producto");
-                System.out.println("3. Eliminar producto");
-            }
-            System.out.println("0. Salir");
-            System.out.print("Seleccione una opción: ");
-            int option = scanner.nextInt();
-            scanner.nextLine(); // Limpiar buffer
+   private static void showMenu(String role) {
+    while (true) {
+        System.out.println("\n=== Menú Principal ===");
+        System.out.println("1. Ver productos");
+        System.out.println("2. Realizar un pedido");
+        System.out.println("3. Ver pedidos");
+        if (role.equals("admin")) {
+            System.out.println("4. Eliminar un pedido");
+        }
+        System.out.println("0. Salir");
+        System.out.print("Seleccione una opción: ");
+        int option = scanner.nextInt();
+        scanner.nextLine(); // Limpiar buffer
 
-            switch (option) {
-                case 1:
-                    listarProductos();
-                    break;
-                case 2:
-                    if (role.equals("admin")) agregarProducto();
-                    else System.out.println("Acceso denegado.");
-                    break;
-                case 3:
-                    if (role.equals("admin")) eliminarProducto();
-                    else System.out.println("Acceso denegado.");
-                    break;
-                case 0:
-                    System.out.println("Saliendo del sistema...");
-                    return;
-                default:
-                    System.out.println("Opción inválida.");
-            }
+        switch (option) {
+            case 1:
+                listarProductos();
+                break;
+            case 2:
+                realizarPedido();
+                break;
+            case 3:
+                listarPedidos();
+                break;
+            case 4:
+                if (role.equals("admin")) eliminarPedido();
+                else System.out.println("Acceso denegado.");
+                break;
+            case 0:
+                System.out.println("Saliendo del sistema...");
+                return;
+            default:
+                System.out.println("Opción inválida.");
         }
     }
+}
 
     // Método para listar productos
     private static void listarProductos() {
@@ -129,4 +132,62 @@ String query = "INSERT INTO productos (nombre, precio) VALUES (?, ?)";
             System.out.println("Error al eliminar producto: " + e.getMessage());
         }
     }
+
+private static void realizarPedido() {
+    System.out.println("\n=== Realizar Pedido ===");
+    
+    // Pedir datos del pedido
+    System.out.print("ID del producto: ");
+    int productoId = scanner.nextInt();
+    System.out.print("Cantidad: ");
+    int cantidad = scanner.nextInt();
+    scanner.nextLine(); // Limpiar buffer
+    System.out.print("Nombre del cliente: ");
+    String cliente = scanner.nextLine();
+
+    String query = "INSERT INTO pedidos (producto_id, cantidad, cliente) VALUES (?, ?, ?)";
+    try (Connection conn = Datos.getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
+        stmt.setInt(1, productoId);
+        stmt.setInt(2, cantidad);
+        stmt.setString(3, cliente);
+        stmt.executeUpdate();
+        System.out.println("Pedido realizado con éxito.");
+    } catch (SQLException e) {
+        System.out.println("Error al realizar el pedido: " + e.getMessage());
+    }
 }
+private static void listarPedidos() {
+    System.out.println("\n=== Lista de Pedidos ===");
+    String query = "SELECT p.id, pr.nombre, p.cantidad, p.cliente FROM pedidos p JOIN productos pr ON p.producto_id = pr.id";
+    try (Connection conn = Datos.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
+        while (rs.next()) {
+            System.out.println("ID: " + rs.getInt("id") +
+                               " | Producto: " + rs.getString("nombre") +
+                               " | Cantidad: " + rs.getInt("cantidad") +
+                               " | Cliente: " + rs.getString("cliente"));
+        }
+    } catch (SQLException e) {
+        System.out.println("Error al obtener pedidos: " + e.getMessage());
+    }
+}
+
+
+private static void eliminarPedido() {
+    System.out.print("\nID del pedido a eliminar: ");
+    int id = scanner.nextInt();
+    scanner.nextLine(); // Limpiar buffer
+
+    String query = "DELETE FROM pedidos WHERE id = ?";
+    try (Connection conn = Datos.getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
+        stmt.setInt(1, id);
+        int rowsAffected = stmt.executeUpdate();
+        if (rowsAffected > 0) {
+            System.out.println("Pedido eliminado con éxito.");
+        } else {
+            System.out.println("No se encontró el pedido con ID " + id);
+        }
+    } catch (SQLException e) {
+        System.out.println("Error al eliminar pedido: " + e.getMessage());
+    }
+  }
+} 
