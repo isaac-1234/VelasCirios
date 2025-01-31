@@ -135,36 +135,141 @@ String query = "INSERT INTO productos (nombre, precio) VALUES (?, ?)";
 
 private static void realizarPedido() {
     System.out.println("\n=== Realizar Pedido ===");
-    
-    // Pedir datos del pedido
-    System.out.print("ID del producto: ");
-    int productoId = scanner.nextInt();
-    System.out.print("Cantidad: ");
-    int cantidad = scanner.nextInt();
-    scanner.nextLine(); // Limpiar buffer
     System.out.print("Nombre del cliente: ");
     String cliente = scanner.nextLine();
 
-    String query = "INSERT INTO pedidos (producto_id, cantidad, cliente) VALUES (?, ?, ?)";
+    // Insertar pedido y obtener ID generado
+    int pedidoId = insertarPedido(cliente);
+    if (pedidoId == -1) {
+        System.out.println("Error al crear el pedido.");
+        return;
+    }
+
+    double totalPedido = 0;
+    while (true) {
+        System.out.print("ID del producto (0 para terminar): ");
+        int productoId = scanner.nextInt();
+        if (productoId == 0) break;
+
+        System.out.print("Cantidad: ");
+        int cantidad = scanner.nextInt();
+        scanner.nextLine(); // Limpiar buffer
+
+        double precioUnitario = obtenerPrecioProducto(productoId);
+        if (precioUnitario == -1) {
+            System.out.println("Producto no encontrado.");
+            continue;
+        }
+
+        double subtotal = precioUnitario * cantidad;
+        totalPedido += subtotal;
+
+        insertarDetallePedido(pedidoId, productoId, cantidad, subtotal);
+        System.out.println("Producto agregado al pedido.");
+    }
+
+    actualizarTotalPedido(pedidoId, totalPedido);
+    System.out.println("Pedido finalizado. Total: $" + totalPedido);
+}
+// Método para insertar un pedido y obtener su ID
+// Método para insertar un pedido y obtener su ID
+
+
+// Método para insertar un detalle de pedido
+private static void insertarDetallePedido(int pedidoId, int productoId, int cantidad, double subtotal) {
+    String query = "INSERT INTO detalle_pedidos (pedido_id, producto_id, cantidad, subtotal) VALUES (?, ?, ?, ?)";
+    try (Connection conn = Datos.getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
+        stmt.setInt(1, pedidoId);
+        stmt.setInt(2, productoId);
+        stmt.setInt(3, cantidad);
+        stmt.setDouble(4, subtotal);
+        stmt.executeUpdate();
+    } catch (SQLException e) {
+        System.out.println("Error al agregar producto al pedido: " + e.getMessage());
+    }
+}
+// Método para actualizar el total del pedido
+
+
+// Método para insertar un pedido y obtener su ID
+private static int insertarPedido(String cliente) {
+    String query = "INSERT INTO pedidos (cliente) VALUES (?) RETURNING id";
+    try (Connection conn = Datos.getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
+        stmt.setString(1, cliente);
+        try (ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) return rs.getInt(1);
+        }
+    } catch (SQLException e) {
+        System.out.println("Error al crear pedido: " + e.getMessage());
+    }
+    return -1;
+}
+
+// Método para insertar un detalle de orden con precio unitario
+private static void insertarDetalleOrden(int pedidoId, int productoId, int cantidad, double precioUnitario, double subtotal) {
+    String query = "INSERT INTO detalle_orden (pedido_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (?, ?, ?, ?, ?)";
+    try (Connection conn = Datos.getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
+        stmt.setInt(1, pedidoId);
+        stmt.setInt(2, productoId);
+        stmt.setInt(3, cantidad);
+        stmt.setDouble(4, precioUnitario);
+        stmt.setDouble(5, subtotal);
+        stmt.executeUpdate();
+    } catch (SQLException e) {
+        System.out.println("Error al agregar producto al pedido: " + e.getMessage());
+    }
+}
+
+// Método para actualizar el total del pedido
+private static void actualizarTotalPedido(int pedidoId, double total) {
+    String query = "UPDATE pedidos SET total = ? WHERE id = ?";
+    try (Connection conn = Datos.getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
+        stmt.setDouble(1, total);
+        stmt.setInt(2, pedidoId);
+        stmt.executeUpdate();
+    } catch (SQLException e) {
+        System.out.println("Error al actualizar total del pedido: " + e.getMessage());
+    }
+}
+
+// Método para obtener el precio de un producto
+private static double obtenerPrecioProducto(int productoId) {
+    String query = "SELECT precio FROM productos WHERE id = ?";
     try (Connection conn = Datos.getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
         stmt.setInt(1, productoId);
-        stmt.setInt(2, cantidad);
-        stmt.setString(3, cliente);
-        stmt.executeUpdate();
-        System.out.println("Pedido realizado con éxito.");
+        try (ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) {
+                return rs.getDouble("precio");
+            }
+        }
     } catch (SQLException e) {
-        System.out.println("Error al realizar el pedido: " + e.getMessage());
+        System.out.println("Error al obtener el precio del producto: " + e.getMessage());
     }
+    return -1; // Si el producto no existe
 }
 private static void listarPedidos() {
     System.out.println("\n=== Lista de Pedidos ===");
-    String query = "SELECT p.id, pr.nombre, p.cantidad, p.cliente FROM pedidos p JOIN productos pr ON p.producto_id = pr.id";
+
+    String query = "SELECT p.id, p.cliente, p.fecha, p.total, dp.producto_id, pr.nombre AS producto, dp.cantidad, dp.subtotal " +
+                   "FROM pedidos p " +
+                   "JOIN detalle_pedidos dp ON p.id = dp.pedido_id " +
+                   "JOIN productos pr ON dp.producto_id = pr.id " +
+                   "ORDER BY p.id";
+
     try (Connection conn = Datos.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
+        int lastPedidoId = -1;
         while (rs.next()) {
-            System.out.println("ID: " + rs.getInt("id") +
-                               " | Producto: " + rs.getString("nombre") +
+            int pedidoId = rs.getInt("id");
+            if (pedidoId != lastPedidoId) {
+                System.out.println("\nPedido ID: " + pedidoId +
+                                   " | Cliente: " + rs.getString("cliente") +
+                                   " | Fecha: " + rs.getTimestamp("fecha") +
+                                   " | Total: $" + rs.getDouble("total"));
+                lastPedidoId = pedidoId;
+            }
+            System.out.println("  → Producto: " + rs.getString("producto") +
                                " | Cantidad: " + rs.getInt("cantidad") +
-                               " | Cliente: " + rs.getString("cliente"));
+                               " | Subtotal: $" + rs.getDouble("subtotal"));
         }
     } catch (SQLException e) {
         System.out.println("Error al obtener pedidos: " + e.getMessage());
