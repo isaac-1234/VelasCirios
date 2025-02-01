@@ -88,7 +88,7 @@ public class VelasCirios {
         String query = "SELECT * FROM productos";
         try (Connection conn = Datos.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
             while (rs.next()) {
-                System.out.println("ID: " + rs.getInt("id") + " | Nombre: " + rs.getString("nombre") + " | Precio: $" + rs.getDouble("precio"));
+                System.out.println("ID: " + rs.getInt("id") + " | Nombre: " + rs.getString("nombre") + " | Precio: $" + rs.getDouble("precio") + " | Cantidad: " + rs.getInt("cantidad"));
             }
         } catch (SQLException e) {
             System.out.println("Error al obtener productos: " + e.getMessage());
@@ -155,19 +155,32 @@ private static void realizarPedido() {
         int cantidad = scanner.nextInt();
         scanner.nextLine(); // Limpiar buffer
 
+        // Obtener precio unitario y verificar disponibilidad
         double precioUnitario = obtenerPrecioProducto(productoId);
+        int cantidadDisponible = obtenerCantidadProducto(productoId);
+
         if (precioUnitario == -1) {
             System.out.println("Producto no encontrado.");
+            continue;
+        }
+        if (cantidad > cantidadDisponible) {
+            System.out.println("Cantidad insuficiente. Disponible: " + cantidadDisponible);
             continue;
         }
 
         double subtotal = precioUnitario * cantidad;
         totalPedido += subtotal;
 
+        // Insertar el detalle del pedido
         insertarDetallePedido(pedidoId, productoId, cantidad, subtotal);
+
+        // Restar la cantidad del inventario
+        actualizarCantidadProducto(productoId, cantidad);
+
         System.out.println("Producto agregado al pedido.");
     }
 
+    // Actualizar el total del pedido
     actualizarTotalPedido(pedidoId, totalPedido);
     System.out.println("Pedido finalizado. Total: $" + totalPedido);
 }
@@ -293,6 +306,36 @@ private static void eliminarPedido() {
         }
     } catch (SQLException e) {
         System.out.println("Error al eliminar pedido: " + e.getMessage());
+    }
+  }
+private static int obtenerCantidadProducto(int productoId) {
+    String sql = "SELECT cantidad FROM productos WHERE id = ?";
+    try (Connection conn = Datos.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+        stmt.setInt(1, productoId);
+        ResultSet rs = stmt.executeQuery();
+
+        if (rs.next()) {
+            return rs.getInt("cantidad");
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+    return -1; // Error o producto no encontrado
+}
+
+private static void actualizarCantidadProducto(int productoId, int cantidad) {
+    String sql = "UPDATE productos SET cantidad = cantidad - ? WHERE id = ?";
+    try (Connection conn = Datos.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+        stmt.setInt(1, cantidad);
+        stmt.setInt(2, productoId);
+        stmt.executeUpdate();
+        System.out.println("Cantidad actualizada para producto ID: " + productoId);
+    } catch (SQLException e) {
+        e.printStackTrace();
     }
   }
 } 
