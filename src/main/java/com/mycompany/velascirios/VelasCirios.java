@@ -19,7 +19,7 @@ public class VelasCirios {
             String role = authenticate(username, password);
             if (role != null) {
                 System.out.println("\nInicio de sesión exitoso. Rol: " + role);
-                showMenu(role);
+                Menu(role);
             } else {
                 System.out.println("Error: Usuario o contraseña incorrectos.");
             }
@@ -45,14 +45,15 @@ public class VelasCirios {
     }
 
     // Menú de opciones según el rol
-   private static void showMenu(String role) {
+private static void Menu(String role) {
     while (true) {
         System.out.println("\n=== Menú Principal ===");
         System.out.println("1. Ver productos");
         System.out.println("2. Realizar un pedido");
         System.out.println("3. Ver pedidos");
+        System.out.println("4. Registrar devolución por producto");
         if (role.equals("admin")) {
-            System.out.println("4. Eliminar un pedido");
+            System.out.println("5. Eliminar un pedido");
         }
         System.out.println("0. Salir");
         System.out.print("Seleccione una opción: ");
@@ -70,6 +71,9 @@ public class VelasCirios {
                 listarPedidos();
                 break;
             case 4:
+                registrarDevolucionPorProducto();
+                break;
+            case 5:
                 if (role.equals("admin")) eliminarPedido();
                 else System.out.println("Acceso denegado.");
                 break;
@@ -80,10 +84,7 @@ public class VelasCirios {
                 System.out.println("Opción inválida.");
         }
     }
-}
-
-    // Método para listar productos
-    private static void listarProductos() {
+}    private static void listarProductos() {
         System.out.println("\n=== Lista de Productos ===");
         String query = "SELECT * FROM productos";
         try (Connection conn = Datos.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
@@ -336,6 +337,103 @@ private static void actualizarCantidadProducto(int productoId, int cantidad) {
         System.out.println("Cantidad actualizada para producto ID: " + productoId);
     } catch (SQLException e) {
         e.printStackTrace();
+    }
+  }
+private static void registrarDevolucionPorProducto() {
+    System.out.println("\n=== Registrar Devolución por Producto ===");
+    System.out.print("ID del pedido: ");
+    int ordenId = scanner.nextInt();
+    System.out.print("ID del producto devuelto: ");
+    int productoId = scanner.nextInt();
+    scanner.nextLine(); // Limpiar buffer
+
+    if (!verificarOrdenYProducto(ordenId, productoId)) {
+        System.out.println("Error: El producto no existe en la orden.");
+        return;
+    }
+
+    System.out.print("Piezas buenas: ");
+    int piezasBuenas = scanner.nextInt();
+    System.out.print("Piezas reparables: ");
+    int piezasReparables = scanner.nextInt();
+    System.out.print("Piezas dañadas: ");
+    int piezasDanadas = scanner.nextInt();
+    System.out.print("Piezas faltantes: ");
+    int piezasFaltantes = scanner.nextInt();
+    scanner.nextLine(); // Limpiar buffer
+    System.out.print("Observaciones: ");
+    String observaciones = scanner.nextLine();
+
+    String query = "INSERT INTO condiciones_entrega (orden_id, producto_id, piezas_buenas, piezas_reparables, piezas_danadas, piezas_faltantes, observaciones) VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+    try (Connection conn = Datos.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(query)) {
+        stmt.setInt(1, ordenId);
+        stmt.setInt(2, productoId);
+        stmt.setInt(3, piezasBuenas);
+        stmt.setInt(4, piezasReparables);
+        stmt.setInt(5, piezasDanadas);
+        stmt.setInt(6, piezasFaltantes);
+        stmt.setString(7, observaciones);
+
+        int rowsInserted = stmt.executeUpdate();
+        if (rowsInserted > 0) {
+            System.out.println("Devolución registrada correctamente.");
+        } else {
+            System.out.println("Error al registrar la devolución.");
+        }
+    } catch (SQLException e) {
+        System.out.println("Error al registrar devolución: " + e.getMessage());
+    }
+}
+
+private static boolean verificarOrdenYProducto(int ordenId, int productoId) {
+    String query = "SELECT * FROM detalle_orden WHERE pedido_id = ? AND producto_id = ?";
+    try (Connection conn = Datos.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(query)) {
+        stmt.setInt(1, ordenId);
+        stmt.setInt(2, productoId);
+        ResultSet rs = stmt.executeQuery();
+        return rs.next(); // Si hay resultados, el producto pertenece al pedido
+    } catch (SQLException e) {
+        System.out.println("Error al verificar producto en orden: " + e.getMessage());
+        return false;
+    }
+}
+private static boolean verificarOrdenExistente(int ordenId) {
+    String query = "SELECT id FROM ordenes_compra WHERE id = ?";
+    try (Connection conn = Datos.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(query)) {
+        stmt.setInt(1, ordenId);
+        ResultSet rs = stmt.executeQuery();
+        return rs.next(); // Si hay resultados, la orden existe
+    } catch (SQLException e) {
+        System.out.println("Error al verificar orden: " + e.getMessage());
+        return false;
+    }
+}
+private static void mostrarDevoluciones() {
+      System.out.println("\n=== Lista de Devoluciones ===");
+    
+    String query = "SELECT * FROM condiciones_entrega";
+
+    try (Connection conn = Datos.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(query);
+         ResultSet rs = stmt.executeQuery()) {
+
+        while (rs.next()) {
+            System.out.println("ID: " + rs.getInt("id"));
+            System.out.println("Orden ID: " + rs.getInt("orden_id"));
+            System.out.println("Piezas Buenas: " + rs.getInt("piezas_buenas"));
+            System.out.println("Piezas Reparables: " + rs.getInt("piezas_reparables"));
+            System.out.println("Piezas Dañadas: " + rs.getInt("piezas_danadas"));
+            System.out.println("Piezas Faltantes: " + rs.getInt("piezas_faltantes"));
+            System.out.println("Observaciones: " + rs.getString("observaciones"));
+            System.out.println("-----------------------------");
+        }
+
+    } catch (SQLException e) {
+        System.out.println("Error al obtener devoluciones: " + e.getMessage());
     }
   }
 } 
