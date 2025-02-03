@@ -221,7 +221,7 @@ private static int insertarPedido(String cliente) {
 
 // Método para insertar un detalle de orden con precio unitario
 private static void insertarDetalleOrden(int pedidoId, int productoId, int cantidad, double precioUnitario, double subtotal) {
-    String query = "INSERT INTO detalle_orden (pedido_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (?, ?, ?, ?, ?)";
+    String query = "INSERT INTO detalle_pedidos (pedido_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (?, ?, ?, ?, ?)";
     try (Connection conn = Datos.getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
         stmt.setInt(1, pedidoId);
         stmt.setInt(2, productoId);
@@ -364,31 +364,50 @@ private static void registrarDevolucionPorProducto() {
     System.out.print("Observaciones: ");
     String observaciones = scanner.nextLine();
 
-    String query = "INSERT INTO condiciones_entrega (orden_id, producto_id, piezas_buenas, piezas_reparables, piezas_danadas, piezas_faltantes, observaciones) VALUES (?, ?, ?, ?, ?, ?, ?)";
+    String queryInsert = "INSERT INTO condiciones_entrega (orden_id, producto_id, piezas_buenas, piezas_reparables, piezas_danadas, piezas_faltantes, observaciones) " +
+                         "VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+    String queryUpdateDetalle = "UPDATE detalle_pedidos SET cantidad = cantidad - (? + ?) " +
+                                "WHERE pedido_id = ? AND producto_id = ?";
+
+    String queryUpdateStock = "UPDATE productos SET cantidad = cantidad + ? " +
+                              "WHERE id = ?";
 
     try (Connection conn = Datos.getConnection();
-         PreparedStatement stmt = conn.prepareStatement(query)) {
-        stmt.setInt(1, ordenId);
-        stmt.setInt(2, productoId);
-        stmt.setInt(3, piezasBuenas);
-        stmt.setInt(4, piezasReparables);
-        stmt.setInt(5, piezasDanadas);
-        stmt.setInt(6, piezasFaltantes);
-        stmt.setString(7, observaciones);
+         PreparedStatement stmtInsert = conn.prepareStatement(queryInsert);
+         PreparedStatement stmtUpdateDetalle = conn.prepareStatement(queryUpdateDetalle);
+         PreparedStatement stmtUpdateStock = conn.prepareStatement(queryUpdateStock)) {
+        
+        // Insertar en condiciones_entrega
+        stmtInsert.setInt(1, ordenId);
+        stmtInsert.setInt(2, productoId);
+        stmtInsert.setInt(3, piezasBuenas);
+        stmtInsert.setInt(4, piezasReparables);
+        stmtInsert.setInt(5, piezasDanadas);
+        stmtInsert.setInt(6, piezasFaltantes);
+        stmtInsert.setString(7, observaciones);
+        stmtInsert.executeUpdate();
 
-        int rowsInserted = stmt.executeUpdate();
-        if (rowsInserted > 0) {
-            System.out.println("Devolución registrada correctamente.");
-        } else {
-            System.out.println("Error al registrar la devolución.");
-        }
+        // Actualizar detalle_pedidos restando piezas dañadas y faltantes
+        stmtUpdateDetalle.setInt(1, piezasDanadas);
+        stmtUpdateDetalle.setInt(2, piezasFaltantes);
+        stmtUpdateDetalle.setInt(3, ordenId);
+        stmtUpdateDetalle.setInt(4, productoId);
+        stmtUpdateDetalle.executeUpdate();
+
+        // Actualizar productos sumando piezas reparables al stock
+        stmtUpdateStock.setInt(1, piezasReparables);
+        stmtUpdateStock.setInt(2, productoId);
+        stmtUpdateStock.executeUpdate();
+
+        System.out.println("Devolución registrada correctamente.");
     } catch (SQLException e) {
         System.out.println("Error al registrar devolución: " + e.getMessage());
     }
 }
 
 private static boolean verificarOrdenYProducto(int ordenId, int productoId) {
-    String query = "SELECT * FROM detalle_orden WHERE pedido_id = ? AND producto_id = ?";
+    String query = "SELECT * FROM detalle_pedidos WHERE pedido_id = ? AND producto_id = ?";
     try (Connection conn = Datos.getConnection();
          PreparedStatement stmt = conn.prepareStatement(query)) {
         stmt.setInt(1, ordenId);
@@ -401,7 +420,7 @@ private static boolean verificarOrdenYProducto(int ordenId, int productoId) {
     }
 }
 private static boolean verificarOrdenExistente(int ordenId) {
-    String query = "SELECT id FROM ordenes_compra WHERE id = ?";
+    String query = "SELECT id FROM pedidos WHERE id = ?";
     try (Connection conn = Datos.getConnection();
          PreparedStatement stmt = conn.prepareStatement(query)) {
         stmt.setInt(1, ordenId);
@@ -434,6 +453,31 @@ private static void mostrarDevoluciones() {
 
     } catch (SQLException e) {
         System.out.println("Error al obtener devoluciones: " + e.getMessage());
+    }
+  }
+private static void listarPiezasDevueltas() {
+    String query = "SELECT ce.id, ce.orden_id, p.nombre AS producto, ce.piezas_buenas, ce.piezas_reparables, ce.piezas_danadas, ce.piezas_faltantes, ce.observaciones " +
+                   "FROM condiciones_entrega ce " +
+                   "JOIN productos p ON ce.producto_id = p.id";
+
+    try (Connection conn = Datos.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(query);
+         ResultSet rs = stmt.executeQuery()) {
+
+        System.out.println("\n=== Piezas Devueltas ===");
+        while (rs.next()) {
+            System.out.println("ID Devolución: " + rs.getInt("id"));
+            System.out.println("Orden ID: " + rs.getInt("orden_id"));
+            System.out.println("Producto: " + rs.getString("producto"));
+            System.out.println("Piezas Buenas: " + rs.getInt("piezas_buenas"));
+            System.out.println("Piezas Reparables: " + rs.getInt("piezas_reparables"));
+            System.out.println("Piezas Dañadas: " + rs.getInt("piezas_danadas"));
+            System.out.println("Piezas Faltantes: " + rs.getInt("piezas_faltantes"));
+            System.out.println("Observaciones: " + rs.getString("observaciones"));
+            System.out.println("----------------------------------");
+        }
+    } catch (SQLException e) {
+        System.out.println("Error al obtener las piezas devueltas: " + e.getMessage());
     }
   }
 } 
