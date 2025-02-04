@@ -7,7 +7,10 @@ public class VelasCirios {
     private static Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) {
+        Login login = new Login();
+        login.setVisible(true);
         System.out.println("=== Sistema Velas y Cirios ===");
+        
 
         // Solicitar credenciales
         System.out.print("Usuario: ");
@@ -45,15 +48,16 @@ public class VelasCirios {
     }
 
     // Menú de opciones según el rol
-private static void Menu(String role) {
+    private static void Menu(String role) {
     while (true) {
         System.out.println("\n=== Menú Principal ===");
         System.out.println("1. Ver productos");
         System.out.println("2. Realizar un pedido");
         System.out.println("3. Ver pedidos");
         System.out.println("4. Registrar devolución por producto");
+        System.out.println("5. Ver piezas devueltas");
         if (role.equals("admin")) {
-            System.out.println("5. Eliminar un pedido");
+            System.out.println("6. Eliminar un pedido");
         }
         System.out.println("0. Salir");
         System.out.print("Seleccione una opción: ");
@@ -74,6 +78,9 @@ private static void Menu(String role) {
                 registrarDevolucionPorProducto();
                 break;
             case 5:
+                listarPiezasDevueltas();
+                break;
+            case 6:
                 if (role.equals("admin")) eliminarPedido();
                 else System.out.println("Acceso denegado.");
                 break;
@@ -84,7 +91,8 @@ private static void Menu(String role) {
                 System.out.println("Opción inválida.");
         }
     }
-}    private static void listarProductos() {
+}
+   private static void listarProductos() {
         System.out.println("\n=== Lista de Productos ===");
         String query = "SELECT * FROM productos";
         try (Connection conn = Datos.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
@@ -456,6 +464,8 @@ private static void mostrarDevoluciones() {
     }
   }
 private static void listarPiezasDevueltas() {
+    System.out.println("\n=== Piezas Devueltas ===");
+
     String query = "SELECT ce.id, ce.orden_id, p.nombre AS producto, ce.piezas_buenas, ce.piezas_reparables, ce.piezas_danadas, ce.piezas_faltantes, ce.observaciones " +
                    "FROM condiciones_entrega ce " +
                    "JOIN productos p ON ce.producto_id = p.id";
@@ -464,20 +474,19 @@ private static void listarPiezasDevueltas() {
          PreparedStatement stmt = conn.prepareStatement(query);
          ResultSet rs = stmt.executeQuery()) {
 
-        System.out.println("\n=== Piezas Devueltas ===");
+        System.out.printf("%-5s %-10s %-20s %-10s %-10s %-10s %-10s %-30s\n", 
+                          "ID", "Orden", "Producto", "Buenas", "Reparables", "Dañadas", "Faltantes", "Observaciones");
+        System.out.println("-------------------------------------------------------------------------------------------");
+
         while (rs.next()) {
-            System.out.println("ID Devolución: " + rs.getInt("id"));
-            System.out.println("Orden ID: " + rs.getInt("orden_id"));
-            System.out.println("Producto: " + rs.getString("producto"));
-            System.out.println("Piezas Buenas: " + rs.getInt("piezas_buenas"));
-            System.out.println("Piezas Reparables: " + rs.getInt("piezas_reparables"));
-            System.out.println("Piezas Dañadas: " + rs.getInt("piezas_danadas"));
-            System.out.println("Piezas Faltantes: " + rs.getInt("piezas_faltantes"));
-            System.out.println("Observaciones: " + rs.getString("observaciones"));
-            System.out.println("----------------------------------");
+            System.out.printf("%-5d %-10d %-20s %-10d %-10d %-10d %-10d %-30s\n", 
+                              rs.getInt("id"), rs.getInt("orden_id"), rs.getString("producto"), 
+                              rs.getInt("piezas_buenas"), rs.getInt("piezas_reparables"), 
+                              rs.getInt("piezas_danadas"), rs.getInt("piezas_faltantes"), 
+                              rs.getString("observaciones"));
         }
     } catch (SQLException e) {
-        System.out.println("Error al obtener las piezas devueltas: " + e.getMessage());
+        System.out.println("Error al listar piezas devueltas: " + e.getMessage());
     }
   }
 } 

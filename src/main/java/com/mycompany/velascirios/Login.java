@@ -12,90 +12,65 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class Login extends JFrame {
-    private JTextField usernameField;
-    private JPasswordField passwordField;
+    private JTextField userField;
+    private JPasswordField passField;
     private JButton loginButton;
 
     public Login() {
-        setTitle("Login - Velas y Cirios");
-        setSize(400, 300);
+        setTitle("Login - VelasCirios");
+        setSize(300, 200);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
-        initUI();
-    }
+        setLayout(new GridLayout(3, 2, 5, 5));
 
-    private void initUI() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints constraints = new GridBagConstraints();
-        constraints.insets = new Insets(10, 10, 10, 10);
+        add(new JLabel("Usuario:"));
+        userField = new JTextField();
+        add(userField);
 
-        JLabel usernameLabel = new JLabel("Usuario:");
-        constraints.gridx = 0;
-        constraints.gridy = 0;
-        panel.add(usernameLabel, constraints);
+        add(new JLabel("Contraseña:"));
+        passField = new JPasswordField();
+        add(passField);
 
-        usernameField = new JTextField(20);
-        constraints.gridx = 1;
-        panel.add(usernameField, constraints);
+        loginButton = new JButton("Iniciar Sesión");
+        add(loginButton);
 
-        JLabel passwordLabel = new JLabel("Contraseña:");
-        constraints.gridx = 0;
-        constraints.gridy = 1;
-        panel.add(passwordLabel, constraints);
-
-        passwordField = new JPasswordField(20);
-        constraints.gridx = 1;
-        panel.add(passwordField, constraints);
-
-        loginButton = new JButton("Iniciar sesión");
-        constraints.gridx = 1;
-        constraints.gridy = 2;
-        panel.add(loginButton, constraints);
-
-        loginButton.addActionListener(new LoginAction());
-
-        add(panel);
-    }
-
-    private class LoginAction implements ActionListener {
-        @Override
-        public void actionPerformed(ActionEvent e) {
-            String username = usernameField.getText();
-            String password = new String(passwordField.getPassword());
-
-            try {
-                if (authenticate(username, password)) {
-                    JOptionPane.showMessageDialog(Login.this, "Inicio de sesión exitoso", "Éxito", JOptionPane.INFORMATION_MESSAGE);
-                    // Aquí puedes abrir la ventana principal del sistema
-                    dispose(); // Cierra la ventana de login
-                } else {
-                    JOptionPane.showMessageDialog(Login.this, "Credenciales incorrectas", "Error", JOptionPane.ERROR_MESSAGE);
-                }
-            } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(Login.this, "Error de conexión: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        loginButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                autenticarUsuario();
             }
-        }
-    }
-
-    private boolean authenticate(String username, String password) throws SQLException {
-        String query = "SELECT * FROM usuarios WHERE nombre = ? AND contraseña = ?";
-        try (Connection conn = Datos.getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
-            stmt.setString(1, username);
-            stmt.setString(2, password);
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                return rs.next(); // Retorna true si encuentra un usuario
-            }
-        }
-    }
-
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            Login login = new Login();
-            login.setVisible(true);
         });
+
+        setVisible(true);
+    }
+
+    private void autenticarUsuario() {
+        String usuario = userField.getText();
+        String contrasena = new String(passField.getPassword());
+
+        try (Connection conn = Datos.getConnection();
+             PreparedStatement stmt = conn.prepareStatement("SELECT rol FROM usuarios WHERE nombre = ? AND contraseña = ?")) {
+            stmt.setString(1, usuario);
+            stmt.setString(2, contrasena);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                String rol = rs.getString("rol");
+                JOptionPane.showMessageDialog(this, "Login exitoso. Rol: " + rol);
+                this.dispose(); // Cierra la ventana de login
+                new Menu(rol).setVisible(true); // Abre el menú principal
+            } else {
+                JOptionPane.showMessageDialog(this, "Usuario o contraseña incorrectos", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al conectar con la base de datos", "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 }
