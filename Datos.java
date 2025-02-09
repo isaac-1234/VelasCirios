@@ -13,17 +13,11 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class Datos {
-
-    private static final String URL = "jdbc:postgresql://localhost:5432/postgres";
-    private static final String USUARIO = "postgres";
-    private static final String CONTRASEÑA = "1234";
-
     public static Connection getConnection() throws SQLException {
-        try {
-            return DriverManager.getConnection(URL, USUARIO, CONTRASEÑA);
-        } catch (SQLException e) {
-            System.err.println("Error al conectar a la base de datos: " + e.getMessage());
-            throw e;
+        String dbUrl = System.getenv("DATABASE_URL");
+        if (dbUrl == null) {
+            throw new SQLException("No se encontró la variable DATABASE_URL");
         }
+        return DriverManager.getConnection(dbUrl);
     }
 }
